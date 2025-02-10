@@ -1,0 +1,9 @@
+[package]
+name = "chip-8"
+authors = ["Cody Simons<csimo005@ucr.edu>"]
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+device_query = "3.0.0"
+termion = "4.0.3"
