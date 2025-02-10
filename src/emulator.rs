@@ -4,7 +4,7 @@ use std::error::Error;
 enum Src {
     Reg(usize),
     Literal(u16),
-//    Stack,
+    //    Stack,
     IReg,
 }
 
@@ -12,15 +12,16 @@ enum Src {
 enum Ops {
     DisplayClear,
     DisplayUpdate(Src, Src, Src),
-//    SubRoutine(Src),
+    //    SubRoutine(Src),
     Jump(Src),
-//    JumpEq(Src, Src, Src),
-//    JumpNeq(Src, Src, Src),
+    //    JumpEq(Src, Src, Src),
+    //    JumpNeq(Src, Src, Src),
     Add(Src, Src, Src),
 }
 
-pub struct EmulatorState { // Going to seperate state out, for use in file io
-    pub ram: Vec<u8>,          // and anticipating emulator will need extra stuff
+pub struct EmulatorState {
+    // Going to seperate state out, for use in file io
+    pub ram: Vec<u8>, // and anticipating emulator will need extra stuff
     pub pc: u16,
     pub ireg: u16,
     pub stack: Vec<u16>,
@@ -36,7 +37,7 @@ pub struct Emulator {
 
 impl Emulator {
     pub fn new() -> Self {
-        Self { 
+        Self {
             state: EmulatorState {
                 ram: vec![0; 4096],
                 pc: 0,
@@ -46,7 +47,7 @@ impl Emulator {
                 sound_timer: 0,
                 register_bank: vec![0; 16],
                 display: vec![false; 32 * 64],
-            }
+            },
         }
     }
 
@@ -65,20 +66,22 @@ impl Emulator {
     pub fn load_state(&self, _state: &EmulatorState) -> Result<(), Box<dyn Error>> {
         todo!();
     }
-    
+
     pub fn get_prog(&self) -> Vec<u8> {
         todo!();
     }
 
     pub fn load_prog(&mut self, prog: &[u8]) -> Result<(), Box<dyn Error>> {
         for i in 0..prog.len() {
-            self.state.ram[i] = prog[i];
+            self.state.ram[512 + i] = prog[i]; // Offset for legacy reasons
         }
+        self.state.pc = 512;
         Ok(())
     }
 
     fn fetch(&mut self) -> u16 {
-        let opcode: u16 = ((self.state.ram[self.state.pc as usize] as u16) << 8) + (self.state.ram[(self.state.pc as usize) + 1] as u16);
+        let opcode: u16 = ((self.state.ram[self.state.pc as usize] as u16) << 8)
+            + (self.state.ram[(self.state.pc as usize) + 1] as u16);
         if opcode != 0 {
             self.state.pc += 2;
         }
@@ -88,36 +91,40 @@ impl Emulator {
 
     fn decode(&self, opcode: u16) -> Ops {
         match (opcode & 0xF000) >> 12 {
-            0x0 => {
-                match opcode & 0x0FFF {
-                    0x0E0 => Ops::DisplayClear,
-                    0x0EE => todo!(),
-                    _ => panic!("Opcode {:04X} not supported", opcode),
-                }
+            0x0 => match opcode & 0x0FFF {
+                0x0E0 => Ops::DisplayClear,
+                0x0EE => todo!(),
+                _ => panic!("Opcode {:04X} not supported", opcode),
             },
-            0x1 => {
-                Ops::Jump(Src::Literal(opcode & 0x0FFF))
-            },
+            0x1 => Ops::Jump(Src::Literal(opcode & 0x0FFF)),
             0x2 => todo!(),
             0x3 => todo!(),
             0x4 => todo!(),
             0x5 => todo!(),
-            0x6 => {
-                Ops::Add(Src::Reg((opcode & 0x0F00 >> 8) as usize), Src::Literal(opcode & 0x00FF), Src::Literal(0))
-            },
-            0x7 => {
-                Ops::Add(Src::Reg((opcode & 0x0F00 >> 8) as usize), Src::Reg((opcode & 0x0F00 >> 8) as usize), Src::Literal(opcode & 0x00FF))
-            }
+            0x6 => Ops::Add(
+                Src::Reg((opcode & 0x0F00 >> 8) as usize),
+                Src::Literal(opcode & 0x00FF),
+                Src::Literal(0),
+            ),
+            0x7 => Ops::Add(
+                Src::Reg((opcode & 0x0F00 >> 8) as usize),
+                Src::Reg((opcode & 0x0F00 >> 8) as usize),
+                Src::Literal(opcode & 0x00FF),
+            ),
             0x8 => todo!(),
             0x9 => todo!(),
-            0xA => {
-                Ops::Add(Src::IReg, Src::Literal(opcode & 0x0FFF >> 8), Src::Literal(0))
-            }
+            0xA => Ops::Add(
+                Src::IReg,
+                Src::Literal(opcode & 0x0FFF >> 8),
+                Src::Literal(0),
+            ),
             0xB => todo!(),
             0xC => todo!(),
-            0xD => {
-                Ops::DisplayUpdate(Src::Reg(((opcode & 0x0F00) >> 8) as usize), Src::Reg(((opcode & 0x00F0) >> 4) as usize), Src::Literal(opcode & 0x000F))
-            }
+            0xD => Ops::DisplayUpdate(
+                Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                Src::Reg(((opcode & 0x00F0) >> 4) as usize),
+                Src::Literal(opcode & 0x000F),
+            ),
             0xE => todo!(),
             0xF => todo!(),
             _ => unreachable!(),
@@ -163,7 +170,8 @@ impl Emulator {
                 self.state.register_bank[vx] = ((a + b) % 256) as u8;
             }
             Ops::Add(Src::Reg(vx), Src::Reg(vy), Src::Literal(n)) => {
-                self.state.register_bank[vx] = ((self.state.register_bank[vy] as u16 + n) % 256) as u8;
+                self.state.register_bank[vx] =
+                    ((self.state.register_bank[vy] as u16 + n) % 256) as u8;
             }
             Ops::Add(_, _, _) => panic!("Unsupported Add: {:?}", op),
         }

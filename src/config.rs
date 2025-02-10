@@ -1,11 +1,9 @@
-use std::error::Error;
+use clap::Parser;
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
 pub struct Config {
-
-}
-
-impl Config {
-    pub fn build(_args: Vec<String>) -> Result<Self, Box<dyn Error>> {
-        Ok(Self { })
-    }
+    /// Optional name to operate on
+    #[arg(short, long)]
+    pub frequency: Option<f32>,
 }

@@ -1,12 +1,11 @@
-use std::env;
+use clap::Parser;
 use std::error::Error;
 
 use chip_8::config::Config;
 use chip_8::run;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    let cfg = Config::build(args)?;
+    let cfg = Config::parse();
     run(cfg)?;
 
     Ok(())

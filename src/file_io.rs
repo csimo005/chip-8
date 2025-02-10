@@ -1,6 +1,6 @@
-use std::fs;
-use std::error::Error;
 use crate::emulator::EmulatorState;
+use std::error::Error;
+use std::fs;
 
 pub fn read_program(fname: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(fs::read(fname)?)
@@ -31,7 +31,7 @@ mod test {
         assert_eq!(prog[1], 0x4E);
         assert_eq!(prog[2], 0xEA);
         assert_eq!(prog[3], 0xAC);
-        
+
         assert_eq!(prog[prog.len() - 4], 0x12);
         assert_eq!(prog[prog.len() - 3], 0x48);
         assert_eq!(prog[prog.len() - 2], 0x13);
