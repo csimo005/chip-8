@@ -317,8 +317,14 @@ impl TUI {
         for i in 0..16 {
             let row = (i / 4) + 35;
             let col = (i % 4) * 6 + 78;
-            
-            write!(self.stdout, "{}{:04X}", termion::cursor::Goto(col, row), register_bank[i as usize]).unwrap();
+
+            write!(
+                self.stdout,
+                "{}{:04X}",
+                termion::cursor::Goto(col, row),
+                register_bank[i as usize]
+            )
+            .unwrap();
         }
     }
 }

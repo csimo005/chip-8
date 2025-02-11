@@ -1,10 +1,10 @@
+use rand::prelude::*;
 use std::error::Error;
 
 #[derive(Debug)]
 enum Src {
     Reg(usize),
     Literal(u16),
-    //    Stack,
     IReg,
 }
 
@@ -12,11 +12,20 @@ enum Src {
 enum Ops {
     DisplayClear,
     DisplayUpdate(Src, Src, Src),
-    //    SubRoutine(Src),
+    CallSubRoutine(Src),
+    ReturnSubRoutine,
     Jump(Src),
-    //    JumpEq(Src, Src, Src),
-    //    JumpNeq(Src, Src, Src),
+    JumpRelative(Src),
+    JumpEq(Src, Src),
+    JumpNeq(Src, Src),
     Add(Src, Src, Src),
+    Sub(Src, Src, Src),
+    And(Src, Src, Src),
+    Or(Src, Src, Src),
+    Xor(Src, Src, Src),
+    LShift(Src),
+    RShift(Src),
+    Rand(Src, Src),
 }
 
 pub struct EmulatorState {
@@ -25,6 +34,7 @@ pub struct EmulatorState {
     pub pc: u16,
     pub ireg: u16,
     pub stack: Vec<u16>,
+    pub stack_len: usize,
     pub delay_timer: u8,
     pub sound_timer: u8,
     pub register_bank: Vec<u8>,
@@ -33,6 +43,7 @@ pub struct EmulatorState {
 
 pub struct Emulator {
     state: EmulatorState,
+    rng_state: ThreadRng,
 }
 
 impl Emulator {
@@ -43,11 +54,13 @@ impl Emulator {
                 pc: 0,
                 ireg: 0,
                 stack: vec![0; 32],
+                stack_len: 0,
                 delay_timer: 0,
                 sound_timer: 0,
                 register_bank: vec![0; 16],
                 display: vec![false; 32 * 64],
             },
+            rng_state: rand::rng(),
         }
     }
 
@@ -93,14 +106,23 @@ impl Emulator {
         match (opcode & 0xF000) >> 12 {
             0x0 => match opcode & 0x0FFF {
                 0x0E0 => Ops::DisplayClear,
-                0x0EE => todo!(),
+                0x0EE => Ops::ReturnSubRoutine,
                 _ => panic!("Opcode {:04X} not supported", opcode),
             },
             0x1 => Ops::Jump(Src::Literal(opcode & 0x0FFF)),
-            0x2 => todo!(),
-            0x3 => todo!(),
-            0x4 => todo!(),
-            0x5 => todo!(),
+            0x2 => Ops::CallSubRoutine(Src::Literal(opcode & 0x0FFF)),
+            0x3 => Ops::JumpEq(
+                Src::Reg(((opcode & 0xF00) >> 8) as usize),
+                Src::Literal(opcode & 0x00FF),
+            ),
+            0x4 => Ops::JumpNeq(
+                Src::Reg(((opcode & 0xF00) >> 8) as usize),
+                Src::Literal(opcode & 0x00FF),
+            ),
+            0x5 => Ops::JumpEq(
+                Src::Reg(((opcode & 0xF00) >> 8) as usize),
+                Src::Reg(((opcode & 0x00F0) >> 8) as usize),
+            ),
             0x6 => Ops::Add(
                 Src::Reg(((opcode & 0x0F00) >> 8) as usize),
                 Src::Literal(opcode & 0x00FF),
@@ -111,15 +133,56 @@ impl Emulator {
                 Src::Reg(((opcode & 0x0F00) >> 8) as usize),
                 Src::Literal(opcode & 0x00FF),
             ),
-            0x8 => todo!(),
-            0x9 => todo!(),
-            0xA => Ops::Add(
-                Src::IReg,
-                Src::Literal(opcode & 0x0FFF),
-                Src::Literal(0),
+            0x8 => match opcode & 0x000F {
+                0x0 => Ops::Add(
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x00F0) >> 4) as usize),
+                    Src::Literal(0),
+                ),
+                0x1 => Ops::Or(
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x00F0) >> 4) as usize),
+                ),
+                0x2 => Ops::And(
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x00F0) >> 4) as usize),
+                ),
+                0x3 => Ops::Xor(
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x00F0) >> 4) as usize),
+                ),
+                0x4 => Ops::Add(
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x00F0) >> 4) as usize),
+                ),
+                0x5 => Ops::Sub(
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x00F0) >> 4) as usize),
+                ),
+                0x6 => Ops::RShift(Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                0x7 => Ops::Sub(
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                    Src::Reg(((opcode & 0x00F0) >> 4) as usize),
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                ),
+                0xE => Ops::LShift(Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                _ => unreachable!(),
+            },
+            0x9 => Ops::JumpNeq(
+                Src::Reg(((opcode & 0xF00) >> 8) as usize),
+                Src::Reg(((opcode & 0x00F0) >> 8) as usize),
             ),
-            0xB => todo!(),
-            0xC => todo!(),
+            0xA => Ops::Add(Src::IReg, Src::Literal(opcode & 0x0FFF), Src::Literal(0)),
+            0xB => Ops::JumpRelative(Src::Literal(opcode & 0x0FFF)),
+            0xC => Ops::Rand(
+                Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                Src::Literal(opcode & 0x00FF),
+            ),
             0xD => Ops::DisplayUpdate(
                 Src::Reg(((opcode & 0x0F00) >> 8) as usize),
                 Src::Reg(((opcode & 0x00F0) >> 4) as usize),
@@ -165,10 +228,54 @@ impl Emulator {
                 }
             }
             Ops::DisplayUpdate(_, _, _) => panic!("Unsupported Display Update: {:?}", op),
+            Ops::CallSubRoutine(Src::Literal(n)) => {
+                if self.state.stack_len < 16 {
+                    self.state.stack[self.state.stack_len] = self.state.pc;
+                    self.state.stack_len += 1;
+                    self.state.pc = n;
+                } else {
+                    panic!("Stack Overflow");
+                }
+            }
+            Ops::CallSubRoutine(_) => panic!("Unsuppoorted CallSubRoutine: {:?}", op),
+            Ops::ReturnSubRoutine => {
+                if self.state.stack_len == 0 {
+                    panic!("Stack Underflow");
+                } else {
+                    self.state.pc = self.state.stack[self.state.stack_len - 1];
+                    self.state.stack_len -= 1;
+                }
+            }
             Ops::Jump(Src::Literal(n)) => {
                 self.state.pc = n;
             }
             Ops::Jump(_) => panic!("Unsupported Jump: {:?}", op),
+            Ops::JumpRelative(Src::Literal(n)) => {
+                self.state.pc = (self.state.register_bank[0] as u16) + n;
+            }
+            Ops::JumpRelative(_) => panic!("Unsupported JumpRelative: {:?}", op),
+            Ops::JumpEq(Src::Reg(vx), Src::Literal(n)) => {
+                if self.state.register_bank[vx] == (n as u8) {
+                    self.state.pc += 2;
+                }
+            }
+            Ops::JumpEq(Src::Reg(vx), Src::Reg(vy)) => {
+                if self.state.register_bank[vx] == self.state.register_bank[vy] {
+                    self.state.pc += 2;
+                }
+            }
+            Ops::JumpEq(_, _) => panic!("Unsupported JumpEq: {:?}", op),
+            Ops::JumpNeq(Src::Reg(vx), Src::Literal(n)) => {
+                if self.state.register_bank[vx] != (n as u8) {
+                    self.state.pc += 2;
+                }
+            }
+            Ops::JumpNeq(Src::Reg(vx), Src::Reg(vy)) => {
+                if self.state.register_bank[vx] != self.state.register_bank[vy] {
+                    self.state.pc += 2;
+                }
+            }
+            Ops::JumpNeq(_, _) => panic!("Unsupported JumpNeq: {:?}", op),
             Ops::Add(Src::IReg, Src::Literal(a), Src::Literal(b)) => {
                 self.state.ireg = a + b;
             }
@@ -179,7 +286,62 @@ impl Emulator {
                 self.state.register_bank[vx] =
                     ((self.state.register_bank[vy] as u16 + n) % 256) as u8;
             }
+            Ops::Add(Src::Reg(vd), Src::Reg(vx), Src::Reg(vy)) => {
+                let res =
+                    (self.state.register_bank[vx] as u16) + (self.state.register_bank[vy] as u16);
+                self.state.register_bank[15] = ((res & 0x0100) >> 8) as u8;
+                self.state.register_bank[vd] = (res & 0x00FF) as u8;
+            }
             Ops::Add(_, _, _) => panic!("Unsupported Add: {:?}", op),
+            Ops::Sub(Src::Reg(vd), Src::Reg(vx), Src::Reg(vy)) => {
+                if self.state.register_bank[vy] > self.state.register_bank[vx] {
+                    self.state.register_bank[15] = 0;
+                    self.state.register_bank[vd] =
+                        255 - (self.state.register_bank[vy] - self.state.register_bank[vx] - 1);
+                } else {
+                    self.state.register_bank[15] = 1;
+                    self.state.register_bank[vd] =
+                        self.state.register_bank[vx] - self.state.register_bank[vy];
+                }
+
+                let res =
+                    (self.state.register_bank[vx] as u16) + (self.state.register_bank[vy] as u16);
+                self.state.register_bank[vd] = (res & 0x00FF) as u8;
+            }
+            Ops::Sub(_, _, _) => panic!("Unsupported Sub: {:?}", op),
+            Ops::Or(Src::Reg(vd), Src::Reg(vx), Src::Reg(vy)) => {
+                self.state.register_bank[vd] =
+                    self.state.register_bank[vx] | self.state.register_bank[vy];
+            }
+            Ops::Or(_, _, _) => panic!("Unsupported BitOr: {:?}", op),
+            Ops::And(Src::Reg(vd), Src::Reg(vx), Src::Reg(vy)) => {
+                self.state.register_bank[vd] =
+                    self.state.register_bank[vx] & self.state.register_bank[vy];
+            }
+            Ops::And(_, _, _) => panic!("Unsupported BitAnd: {:?}", op),
+            Ops::Xor(Src::Reg(vd), Src::Reg(vx), Src::Reg(vy)) => {
+                self.state.register_bank[vd] =
+                    self.state.register_bank[vx] ^ self.state.register_bank[vy];
+            }
+            Ops::Xor(_, _, _) => panic!("Unsupported BitXor: {:?}", op),
+            Ops::RShift(Src::Reg(vx)) => {
+                if self.state.register_bank[vx] & 0x01 > 0 {
+                    self.state.register_bank[15] = 1;
+                }
+                self.state.register_bank[vx] = (self.state.register_bank[vx] & 0xFE) >> 1;
+            }
+            Ops::RShift(_) => panic!("Unsupported LShift: {:?}", op),
+            Ops::LShift(Src::Reg(vx)) => {
+                if self.state.register_bank[vx] & 0x80 > 0 {
+                    self.state.register_bank[15] = 1;
+                }
+                self.state.register_bank[vx] = (self.state.register_bank[vx] & 0x7F) << 1;
+            }
+            Ops::LShift(_) => panic!("Unsupported LShift: {:?}", op),
+            Ops::Rand(Src::Reg(vx), Src::Literal(n)) => {
+                self.state.register_bank[vx] = self.rng_state.random::<u8>() & (n as u8);
+            }
+            Ops::Rand(_, _) => panic!("Unsupported Rand: {:?}", op),
         }
     }
 }

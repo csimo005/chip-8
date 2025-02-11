@@ -16,7 +16,7 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
     tui.init_tui();
 
     let mut ch8 = Emulator::new();
-    ch8.load_prog(&read_program("programs/IBM_Logo.ch8")?)?;
+    ch8.load_prog(&read_program("programs/test_opcode.ch8")?)?;
     tui.update_tui(&ch8.get_state());
 
     let em_freq: u32 = match cfg.frequency {
@@ -34,12 +34,12 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
         ),
         (em_freq, Box::new(|em, t| em.step(t.get_keys()))),
     ];
-    
+
     let mut prod = 1;
     for job in sched.iter() {
         prod *= job.0;
     }
-    
+
     let mut cnt: u32 = 0;
     while tui.is_running() {
         for job in sched.iter() {
