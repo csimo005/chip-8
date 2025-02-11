@@ -186,8 +186,8 @@ impl Emulator {
                 _ => unreachable!(),
             },
             0x9 => Ops::JumpNeq(
-                Src::Reg(((opcode & 0xF00) >> 8) as usize),
-                Src::Reg(((opcode & 0x00F0) >> 8) as usize),
+                Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                Src::Reg(((opcode & 0x00F0) >> 4) as usize),
             ),
             0xA => Ops::Add(Src::IReg, Src::Literal(opcode & 0x0FFF), Src::Literal(0)),
             0xB => Ops::JumpRelative(Src::Literal(opcode & 0x0FFF)),
