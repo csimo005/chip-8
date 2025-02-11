@@ -36,6 +36,7 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
                 t.update_tui(em.get_state())
             }),
         ),
+        (17, Box::new(|em, _t| em.tick())),
         (em_freq, Box::new(|em, t| em.step(t.get_keys()))),
     ];
 

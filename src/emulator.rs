@@ -106,6 +106,15 @@ impl Emulator {
         }
     }
 
+    pub fn tick(&mut self) {
+        if self.state.delay_timer > 0 {
+            self.state.delay_timer -= 1;
+        }
+        if self.state.sound_timer > 0 {
+            self.state.sound_timer -= 1;
+        }
+    }
+
     pub fn get_state(&self) -> &EmulatorState {
         &self.state
     }
@@ -316,7 +325,7 @@ impl Emulator {
                 }
             }
             Ops::JumpEq(Src::Key, Src::Reg(vx)) => {
-                if keys & (1 << (self.state.register_bank[vx] as u16)) > 0 {
+                if keys & (1 << ((self.state.register_bank[vx] as u16) & 0x000F)) > 0 {
                     self.state.pc += 2;
                 }
             }
@@ -332,7 +341,7 @@ impl Emulator {
                 }
             }
             Ops::JumpNeq(Src::Key, Src::Reg(vx)) => {
-                if keys & (1 << (self.state.register_bank[vx] as u16)) == 0 {
+                if keys & (1 << ((self.state.register_bank[vx] as u16) & 0x000F)) == 0 {
                     self.state.pc += 2;
                 }
             }
