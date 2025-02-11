@@ -102,20 +102,20 @@ impl Emulator {
             0x4 => todo!(),
             0x5 => todo!(),
             0x6 => Ops::Add(
-                Src::Reg((opcode & 0x0F00 >> 8) as usize),
+                Src::Reg(((opcode & 0x0F00) >> 8) as usize),
                 Src::Literal(opcode & 0x00FF),
                 Src::Literal(0),
             ),
             0x7 => Ops::Add(
-                Src::Reg((opcode & 0x0F00 >> 8) as usize),
-                Src::Reg((opcode & 0x0F00 >> 8) as usize),
+                Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                Src::Reg(((opcode & 0x0F00) >> 8) as usize),
                 Src::Literal(opcode & 0x00FF),
             ),
             0x8 => todo!(),
             0x9 => todo!(),
             0xA => Ops::Add(
                 Src::IReg,
-                Src::Literal(opcode & 0x0FFF >> 8),
+                Src::Literal(opcode & 0x0FFF),
                 Src::Literal(0),
             ),
             0xB => todo!(),
@@ -139,15 +139,21 @@ impl Emulator {
                 }
             }
             Ops::DisplayUpdate(Src::Reg(vx), Src::Reg(vy), Src::Literal(n)) => {
-                let px = self.state.register_bank[vx] as usize;
-                let py = self.state.register_bank[vy] as usize;
+                let px = (self.state.register_bank[vx] & 0x3F) as usize;
+                let py = (self.state.register_bank[vy] & 0x1F) as usize;
                 self.state.register_bank[15] = 0;
 
                 for offset in 0..(n as usize) {
-                    let addr = (self.state.ireg as usize) + offset;
-                    for b in 0..8 {
-                        if self.state.ram[addr] & (1 << b) > 0 {
-                            let idx = (py + offset) * 64 + (px + b as usize);
+                    if py + offset > 31 {
+                        break;
+                    }
+                    let byte = self.state.ram[(self.state.ireg as usize) + offset];
+                    for bit in 0..8 {
+                        if px + (bit as usize) > 63 {
+                            break;
+                        }
+                        if byte & (0x80 >> bit) > 0 {
+                            let idx = (py + offset) * 64 + px + (bit as usize);
                             if self.state.display[idx] {
                                 self.state.display[idx] = false;
                                 self.state.register_bank[15] = 1;

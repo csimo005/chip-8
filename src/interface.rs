@@ -71,6 +71,7 @@ impl TUI {
         self.draw_keypad();
         self.draw_program(&state.ram, state.pc);
         self.draw_values(state.pc, state.ireg, state.delay_timer, state.sound_timer);
+        self.draw_registers(&state.register_bank);
 
         self.stdout.flush().unwrap();
     }
@@ -310,6 +311,15 @@ impl TUI {
             sound
         )
         .unwrap();
+    }
+
+    fn draw_registers(&mut self, register_bank: &Vec<u8>) {
+        for i in 0..16 {
+            let row = (i / 4) + 35;
+            let col = (i % 4) * 6 + 78;
+            
+            write!(self.stdout, "{}{:04X}", termion::cursor::Goto(col, row), register_bank[i as usize]).unwrap();
+        }
     }
 }
 
