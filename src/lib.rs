@@ -11,6 +11,8 @@ pub mod emulator;
 pub mod file_io;
 pub mod interface;
 
+type SchedulerJob = Box<dyn Fn(&mut Emulator, &mut TUI)>;
+
 pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
     let mut tui = TUI::new();
     tui.init_tui();
@@ -18,7 +20,7 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
     let mut ch8 = Emulator::new();
     if let Some(fname) = cfg.program {
         ch8.load_prog(&read_program(&fname)?)?;
-        tui.update_tui(&ch8.get_state());
+        tui.update_tui(ch8.get_state());
     }
 
     let em_freq: u32 = match cfg.frequency {
@@ -26,12 +28,12 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
         None => 10,
     };
 
-    let sched: Vec<(u32, Box<dyn Fn(&mut Emulator, &mut TUI)>)> = vec![
+    let sched: Vec<(u32, SchedulerJob)> = vec![
         (
             17,
             Box::new(|em, t| {
                 t.update_keys();
-                t.update_tui(&em.get_state())
+                t.update_tui(em.get_state())
             }),
         ),
         (em_freq, Box::new(|em, t| em.step(t.get_keys()))),

@@ -23,7 +23,7 @@ impl TUI {
         let stdout = stdout().into_raw_mode().unwrap();
 
         Self {
-            stdout: stdout,
+            stdout,
             display: vec![false; 32 * 64],
             prog: vec![0; 4096],
             pc: None,
@@ -110,9 +110,9 @@ impl TUI {
             ];
 
             let mut k = 0;
-            for i in 0..16 {
+            for keycode in keycodes {
                 k *= 2;
-                if keys.contains(&keycodes[i]) {
+                if keys.contains(&keycode) {
                     k += 1;
                 }
             }
@@ -125,7 +125,7 @@ impl TUI {
         self.keys.unwrap()
     }
 
-    fn draw_display(&mut self, display: &Vec<bool>) {
+    fn draw_display(&mut self, display: &[bool]) {
         for r in 0..32 {
             for c in 0..64 {
                 let idx = (r * 64 + c) as usize;
@@ -150,7 +150,7 @@ impl TUI {
         let syms: Vec<char> = vec![
             '1', '2', '3', 'C', '4', '5', '6', 'D', '7', '8', '9', 'E', 'A', '0', 'B', 'F',
         ];
-        for i in 0..syms.len() {
+        for (i, sym) in syms.iter().enumerate() {
             let r = 35 + ((i / 4) as u16);
             let c = 2 + ((i % 4) as u16);
             if let Some(k) = self.keys {
@@ -160,12 +160,12 @@ impl TUI {
                         "{}{}{}{}",
                         termion::cursor::Goto(c, r),
                         style::Invert,
-                        syms[i],
+                        sym,
                         style::NoInvert
                     )
                     .unwrap();
                 } else {
-                    write!(self.stdout, "{}{}", termion::cursor::Goto(c, r), syms[i]).unwrap();
+                    write!(self.stdout, "{}{}", termion::cursor::Goto(c, r), sym).unwrap();
                 }
             }
         }
@@ -187,7 +187,7 @@ impl TUI {
                             "{}{:04X}",
                             termion::cursor::Goto(
                                 (((2 * i) % 16) * 3 + 75) as u16,
-                                ((line - self.prog_offset.unwrap()) + 2) as u16
+                                line - self.prog_offset.unwrap() + 2
                             ),
                             cmd
                         )
@@ -212,7 +212,7 @@ impl TUI {
                     write!(
                         self.stdout,
                         "{}{:04X}",
-                        termion::cursor::Goto(68, (l + 2) as u16),
+                        termion::cursor::Goto(68, l + 2),
                         self.prog_offset.unwrap() + l
                     )
                     .unwrap();
@@ -225,7 +225,7 @@ impl TUI {
                         write!(
                             self.stdout,
                             "{}{:04X}",
-                            termion::cursor::Goto((6 * c + 75) as u16, (l + 2) as u16),
+                            termion::cursor::Goto(6 * c + 75, l + 2),
                             cmd
                         )
                         .unwrap();
@@ -238,7 +238,7 @@ impl TUI {
                 write!(
                     self.stdout,
                     "{}{:04X}",
-                    termion::cursor::Goto(68, (l + 2) as u16),
+                    termion::cursor::Goto(68, l + 2),
                     (self.prog_offset.unwrap() + l) * 16,
                 )
                 .unwrap();
@@ -251,7 +251,7 @@ impl TUI {
                     write!(
                         self.stdout,
                         "{}{:04X}",
-                        termion::cursor::Goto((6 * c + 75) as u16, (l + 2) as u16),
+                        termion::cursor::Goto(6 * c + 75, l + 2),
                         cmd
                     )
                     .unwrap();
@@ -269,10 +269,7 @@ impl TUI {
                 write!(
                     self.stdout,
                     "{}{:04X}",
-                    termion::cursor::Goto(
-                        col as u16,
-                        ((line - self.prog_offset.unwrap()) + 2) as u16
-                    ),
+                    termion::cursor::Goto(col, line - self.prog_offset.unwrap() + 2),
                     cmd
                 )
                 .unwrap();
@@ -287,7 +284,7 @@ impl TUI {
         write!(
             self.stdout,
             "{}{}{:04X}{}",
-            termion::cursor::Goto(col as u16, ((line - self.prog_offset.unwrap()) + 2) as u16),
+            termion::cursor::Goto(col, line - self.prog_offset.unwrap() + 2),
             style::Invert,
             cmd,
             style::NoInvert
@@ -314,7 +311,7 @@ impl TUI {
         .unwrap();
     }
 
-    fn draw_registers(&mut self, register_bank: &Vec<u8>) {
+    fn draw_registers(&mut self, register_bank: &[u8]) {
         for i in 0..16 {
             let row = (i / 4) + 35;
             let col = (i % 4) * 6 + 78;
@@ -329,8 +326,8 @@ impl TUI {
         }
     }
 
-    fn draw_stack(&mut self, stack: &Vec<u16>, len: usize) {
-        for i in 0..16 {
+    fn draw_stack(&mut self, stack: &[u16], len: usize) {
+        for (i, val) in stack.iter().enumerate().take(16) {
             let row = ((i / 4) + 35) as u16;
             let col = ((i % 4) * 6 + 101) as u16;
 
@@ -339,7 +336,7 @@ impl TUI {
                     self.stdout,
                     "{}{:04X}",
                     termion::cursor::Goto(col, row),
-                    stack[i as usize]
+                    val
                 )
                 .unwrap();
             } else {
@@ -361,8 +358,12 @@ impl Drop for TUI {
         self.stdout.flush().unwrap();
 
         let stdin = stdin();
-        for _ in stdin.keys() {
-            break;
-        }
+        if stdin.keys().next().is_some() {}
+    }
+}
+
+impl Default for TUI {
+    fn default() -> Self {
+        Self::new()
     }
 }

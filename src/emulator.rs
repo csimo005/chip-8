@@ -10,6 +10,7 @@ enum Src {
 }
 
 #[derive(Debug)]
+#[allow(clippy::upper_case_acronyms)]
 enum Ops {
     DisplayClear,
     DisplayUpdate(Src, Src, Src),
@@ -59,86 +60,25 @@ pub struct Emulator {
 impl Emulator {
     pub fn new() -> Self {
         let mut ram: Vec<u8> = vec![0; 4096];
-        ram[0x0050] = 0xF0;
-        ram[0x0051] = 0x90;
-        ram[0x0052] = 0x90;
-        ram[0x0053] = 0x90;
-        ram[0x0054] = 0xF0;
-        ram[0x0055] = 0x20;
-        ram[0x0056] = 0x60;
-        ram[0x0057] = 0x20;
-        ram[0x0058] = 0x20;
-        ram[0x0059] = 0x70;
-        ram[0x005A] = 0xF0;
-        ram[0x005B] = 0x10;
-        ram[0x005C] = 0xF0;
-        ram[0x005D] = 0x80;
-        ram[0x005E] = 0xF0;
-        ram[0x005F] = 0xF0;
-        ram[0x0060] = 0x10;
-        ram[0x0061] = 0xF0;
-        ram[0x0062] = 0x10;
-        ram[0x0063] = 0xF0;
-        ram[0x0064] = 0x90;
-        ram[0x0065] = 0x90;
-        ram[0x0066] = 0xF0;
-        ram[0x0067] = 0x10;
-        ram[0x0068] = 0x10;
-        ram[0x0069] = 0xF0;
-        ram[0x006A] = 0x80;
-        ram[0x006B] = 0xF0;
-        ram[0x006C] = 0x10;
-        ram[0x006D] = 0xF0;
-        ram[0x006E] = 0xF0;
-        ram[0x006F] = 0x80;
-        ram[0x0070] = 0xF0;
-        ram[0x0071] = 0x90;
-        ram[0x0072] = 0xF0;
-        ram[0x0073] = 0xF0;
-        ram[0x0074] = 0x10;
-        ram[0x0075] = 0x20;
-        ram[0x0076] = 0x40;
-        ram[0x0077] = 0x40;
-        ram[0x0078] = 0xF0;
-        ram[0x0079] = 0x90;
-        ram[0x007A] = 0xF0;
-        ram[0x007B] = 0x90;
-        ram[0x007C] = 0xF0;
-        ram[0x007D] = 0xF0;
-        ram[0x007E] = 0x90;
-        ram[0x007F] = 0xF0;
-        ram[0x0080] = 0x10;
-        ram[0x0081] = 0xF0;
-        ram[0x0082] = 0xF0;
-        ram[0x0083] = 0x90;
-        ram[0x0084] = 0xF0;
-        ram[0x0085] = 0x90;
-        ram[0x0086] = 0x90;
-        ram[0x0087] = 0xE0;
-        ram[0x0088] = 0x90;
-        ram[0x0089] = 0xE0;
-        ram[0x008A] = 0x90;
-        ram[0x008B] = 0xE0;
-        ram[0x008C] = 0xF0;
-        ram[0x008D] = 0x80;
-        ram[0x008E] = 0x80;
-        ram[0x008F] = 0x80;
-        ram[0x0090] = 0xF0;
-        ram[0x0091] = 0xE0;
-        ram[0x0092] = 0x90;
-        ram[0x0093] = 0x90;
-        ram[0x0094] = 0x90;
-        ram[0x0095] = 0xE0;
-        ram[0x0096] = 0xF0;
-        ram[0x0097] = 0x80;
-        ram[0x0098] = 0xF0;
-        ram[0x0099] = 0x80;
-        ram[0x009A] = 0xF0;
-        ram[0x009B] = 0xF0;
-        ram[0x009C] = 0x80;
-        ram[0x009D] = 0xF0;
-        ram[0x009E] = 0x80;
-        ram[0x009F] = 0x80;
+        let sprites: Vec<u8> = vec![
+            0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+            0x20, 0x60, 0x20, 0x20, 0x70, // 1
+            0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+            0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+            0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+            0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+            0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+            0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+            0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+            0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+            0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+            0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+            0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+            0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+            0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+            0xF0, 0x80, 0xF0, 0x80, 0x80,
+        ]; // F
+        ram[0x50..(sprites.len() + 0x50)].copy_from_slice(&sprites[..]);
 
         Self {
             state: EmulatorState {
@@ -179,9 +119,7 @@ impl Emulator {
     }
 
     pub fn load_prog(&mut self, prog: &[u8]) -> Result<(), Box<dyn Error>> {
-        for i in 0..prog.len() {
-            self.state.ram[512 + i] = prog[i]; // Offset for legacy reasons
-        }
+        self.state.ram[512..(prog.len() + 512)].copy_from_slice(prog);
         self.state.pc = 512;
         Ok(())
     }
@@ -403,7 +341,7 @@ impl Emulator {
                 self.state.ireg = a + b;
             }
             Ops::Add(Src::IReg, Src::IReg, Src::Reg(vx)) => {
-                self.state.ireg = self.state.ireg + (self.state.register_bank[vx] as u16);
+                self.state.ireg += self.state.register_bank[vx] as u16;
             }
             Ops::Add(Src::Reg(vx), Src::Literal(a), Src::Literal(b)) => {
                 self.state.register_bank[vx] = ((a + b) % 256) as u8;
@@ -496,26 +434,32 @@ impl Emulator {
             Ops::BCD(Src::Reg(vx)) => {
                 let mut val = self.state.register_bank[vx];
                 self.state.ram[(self.state.ireg + 2) as usize] = val % 10;
-                val = val / 10;
+                val /= 10;
                 self.state.ram[(self.state.ireg + 1) as usize] = val % 10;
-                val = val / 10;
+                val /= 10;
                 self.state.ram[self.state.ireg as usize] = val % 10;
             }
             Ops::BCD(_) => panic!("Upsupported BCD: {:?}", op),
             Ops::RegDump(Src::Reg(vx)) => {
                 for i in 0..=vx {
                     self.state.ram[(self.state.ireg + i as u16) as usize] =
-                        self.state.register_bank[i as usize];
+                        self.state.register_bank[i];
                 }
             }
             Ops::RegDump(_) => panic!("Unsupported RegDump: {:?}", op),
             Ops::RegLoad(Src::Reg(vx)) => {
                 for i in 0..=vx {
-                    self.state.register_bank[i as usize] =
+                    self.state.register_bank[i] =
                         self.state.ram[(self.state.ireg + i as u16) as usize];
                 }
             }
             Ops::RegLoad(_) => panic!("Unsupported RegLoad: {:?}", op),
         }
+    }
+}
+
+impl Default for Emulator {
+    fn default() -> Self {
+        Self::new()
     }
 }
