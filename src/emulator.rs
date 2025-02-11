@@ -5,6 +5,7 @@ use std::error::Error;
 enum Src {
     Reg(usize),
     Literal(u16),
+    Key,
     IReg,
 }
 
@@ -26,6 +27,14 @@ enum Ops {
     LShift(Src),
     RShift(Src),
     Rand(Src, Src),
+    ReadDelay(Src),
+    GetKey(Src),
+    WriteDelay(Src),
+    WriteSound(Src),
+    GetSprite(Src),
+    BCD(Src),
+    RegDump(Src),
+    RegLoad(Src),
 }
 
 pub struct EmulatorState {
@@ -44,6 +53,7 @@ pub struct EmulatorState {
 pub struct Emulator {
     state: EmulatorState,
     rng_state: ThreadRng,
+    prev_keys: u16,
 }
 
 impl Emulator {
@@ -61,14 +71,16 @@ impl Emulator {
                 display: vec![false; 32 * 64],
             },
             rng_state: rand::rng(),
+            prev_keys: 0,
         }
     }
 
-    pub fn step(&mut self, _keys: u16) {
+    pub fn step(&mut self, keys: u16) {
         let opcode = self.fetch();
         if opcode != 0 {
             let op = self.decode(opcode);
-            self.execute(op);
+            self.execute(op, keys);
+            self.prev_keys = keys;
         }
     }
 
@@ -188,13 +200,32 @@ impl Emulator {
                 Src::Reg(((opcode & 0x00F0) >> 4) as usize),
                 Src::Literal(opcode & 0x000F),
             ),
-            0xE => todo!(),
-            0xF => todo!(),
+            0xE => match opcode & 0x00FF {
+                0x9E => Ops::JumpEq(Src::Key, Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                0xA1 => Ops::JumpNeq(Src::Key, Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                _ => unreachable!(),
+            },
+            0xF => match opcode & 0x00FF {
+                0x07 => Ops::ReadDelay(Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                0x0A => Ops::GetKey(Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                0x15 => Ops::WriteDelay(Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                0x18 => Ops::WriteSound(Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                0x1E => Ops::Add(
+                    Src::IReg,
+                    Src::IReg,
+                    Src::Reg(((opcode & 0x0F00) >> 8) as usize),
+                ),
+                0x29 => Ops::GetSprite(Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                0x33 => Ops::BCD(Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                0x55 => Ops::RegDump(Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                0x65 => Ops::RegLoad(Src::Reg(((opcode & 0x0F00) >> 8) as usize)),
+                _ => unreachable!(),
+            },
             _ => unreachable!(),
         }
     }
 
-    fn execute(&mut self, op: Ops) {
+    fn execute(&mut self, op: Ops, keys: u16) {
         match op {
             Ops::DisplayClear => {
                 for i in 0..self.state.display.len() {
@@ -264,6 +295,11 @@ impl Emulator {
                     self.state.pc += 2;
                 }
             }
+            Ops::JumpEq(Src::Key, Src::Reg(vx)) => {
+                if keys & (1 << (self.state.register_bank[vx] as u16)) > 0 {
+                    self.state.pc += 2;
+                }
+            }
             Ops::JumpEq(_, _) => panic!("Unsupported JumpEq: {:?}", op),
             Ops::JumpNeq(Src::Reg(vx), Src::Literal(n)) => {
                 if self.state.register_bank[vx] != (n as u8) {
@@ -275,9 +311,17 @@ impl Emulator {
                     self.state.pc += 2;
                 }
             }
+            Ops::JumpNeq(Src::Key, Src::Reg(vx)) => {
+                if keys & (1 << (self.state.register_bank[vx] as u16)) == 0 {
+                    self.state.pc += 2;
+                }
+            }
             Ops::JumpNeq(_, _) => panic!("Unsupported JumpNeq: {:?}", op),
             Ops::Add(Src::IReg, Src::Literal(a), Src::Literal(b)) => {
                 self.state.ireg = a + b;
+            }
+            Ops::Add(Src::IReg, Src::IReg, Src::Reg(vx)) => {
+                self.state.ireg = self.state.ireg + (self.state.register_bank[vx] as u16);
             }
             Ops::Add(Src::Reg(vx), Src::Literal(a), Src::Literal(b)) => {
                 self.state.register_bank[vx] = ((a + b) % 256) as u8;
@@ -342,6 +386,58 @@ impl Emulator {
                 self.state.register_bank[vx] = self.rng_state.random::<u8>() & (n as u8);
             }
             Ops::Rand(_, _) => panic!("Unsupported Rand: {:?}", op),
+            Ops::ReadDelay(Src::Reg(vx)) => {
+                self.state.register_bank[vx] = self.state.delay_timer;
+            }
+            Ops::ReadDelay(_) => panic!("Unsupported GetDelay: {:?}", op),
+            Ops::GetKey(Src::Reg(vx)) => {
+                if keys != self.prev_keys {
+                    for i in 0..16 {
+                        if (keys ^ self.prev_keys) & (1 << i) > 0 {
+                            self.state.register_bank[vx] = i as u8;
+                            break;
+                        }
+                    }
+                } else {
+                    self.state.pc -= 1;
+                }
+            }
+            Ops::GetKey(_) => panic!("Unsupported GetKey: {:?}", op),
+            Ops::WriteDelay(Src::Reg(vx)) => {
+                self.state.delay_timer = self.state.register_bank[vx];
+            }
+            Ops::WriteDelay(_) => panic!("Unsupported WriteDelay: {:?}", op),
+            Ops::WriteSound(Src::Reg(vx)) => {
+                self.state.sound_timer = self.state.register_bank[vx];
+            }
+            Ops::WriteSound(_) => panic!("Unsupported WriteSound: {:?}", op),
+            Ops::GetSprite(Src::Reg(vx)) => {
+                self.state.ireg = 0x0050 + (0x0005 * (self.state.register_bank[vx] as u16));
+            }
+            Ops::GetSprite(_) => panic!("Upsupported GetSprite: {:?}", op),
+            Ops::BCD(Src::Reg(vx)) => {
+                let mut val = self.state.register_bank[vx];
+                self.state.ram[(self.state.ireg + 2) as usize] = val % 10;
+                val = val / 10;
+                self.state.ram[(self.state.ireg + 1) as usize] = val % 10;
+                val = val / 10;
+                self.state.ram[self.state.ireg as usize] = val % 10;
+            }
+            Ops::BCD(_) => panic!("Upsupported BCD: {:?}", op),
+            Ops::RegDump(Src::Reg(vx)) => {
+                for i in 0..=vx {
+                    self.state.ram[(self.state.ireg + i as u16) as usize] =
+                        self.state.register_bank[i as usize];
+                }
+            }
+            Ops::RegDump(_) => panic!("Unsupported RegDump: {:?}", op),
+            Ops::RegLoad(Src::Reg(vx)) => {
+                for i in 0..=vx {
+                    self.state.register_bank[i as usize] =
+                        self.state.ram[(self.state.ireg + i as u16) as usize];
+                }
+            }
+            Ops::RegLoad(_) => panic!("Unsupported RegLoad: {:?}", op),
         }
     }
 }
