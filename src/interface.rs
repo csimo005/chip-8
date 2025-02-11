@@ -72,6 +72,7 @@ impl TUI {
         self.draw_program(&state.ram, state.pc);
         self.draw_values(state.pc, state.ireg, state.delay_timer, state.sound_timer);
         self.draw_registers(&state.register_bank);
+        self.draw_stack(&state.stack, state.stack_len);
 
         self.stdout.flush().unwrap();
     }
@@ -325,6 +326,25 @@ impl TUI {
                 register_bank[i as usize]
             )
             .unwrap();
+        }
+    }
+
+    fn draw_stack(&mut self, stack: &Vec<u16>, len: usize) {
+        for i in 0..16 {
+            let row = ((i / 4) + 35) as u16;
+            let col = ((i % 4) * 6 + 101) as u16;
+
+            if i < len {
+                write!(
+                    self.stdout,
+                    "{}{:04X}",
+                    termion::cursor::Goto(col, row),
+                    stack[i as usize]
+                )
+                .unwrap();
+            } else {
+                write!(self.stdout, "{}....", termion::cursor::Goto(col, row)).unwrap();
+            }
         }
     }
 }
