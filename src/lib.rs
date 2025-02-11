@@ -16,8 +16,10 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
     tui.init_tui();
 
     let mut ch8 = Emulator::new();
-    ch8.load_prog(&read_program("programs/test_opcode.ch8")?)?;
-    tui.update_tui(&ch8.get_state());
+    if let Some(fname) = cfg.program {
+        ch8.load_prog(&read_program(&fname)?)?;
+        tui.update_tui(&ch8.get_state());
+    }
 
     let em_freq: u32 = match cfg.frequency {
         Some(f) => (1000. / f) as u32,
