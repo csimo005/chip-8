@@ -347,10 +347,6 @@ impl Emulator {
                     self.state.register_bank[vd] =
                         self.state.register_bank[vx] - self.state.register_bank[vy];
                 }
-
-                let res =
-                    (self.state.register_bank[vx] as u16) + (self.state.register_bank[vy] as u16);
-                self.state.register_bank[vd] = (res & 0x00FF) as u8;
             }
             Ops::Sub(_, _, _) => panic!("Unsupported Sub: {:?}", op),
             Ops::Or(Src::Reg(vd), Src::Reg(vx), Src::Reg(vy)) => {
