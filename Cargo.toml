@@ -1,6 +1,8 @@
 [package]
 name = "chip-8"
 authors = ["Cody Simons<csimo005@ucr.edu>"]
+readme = "README.md"
+license = "MIT OR Apache-2.0"
 version = "0.1.0"
 edition = "2021"
 
